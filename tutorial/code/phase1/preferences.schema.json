@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "mirai-menu/v1 constraints（相手に送ってよい情報だけ）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["avoid"],
+  "properties": {
+    "avoid": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["えび","いか","貝","魚卵","卵","乳","小麦","ナッツ","牛","豚","鶏","きのこ","にんにく","辛い","アルコール","カフェイン"] }
+    },
+    "allergy": { "type": "boolean", "description": "true なら『好みではなく厳守』の意味。病名は書かない" },
+    "drinks": { "type": "string", "maxLength": 60 }
+  }
+}

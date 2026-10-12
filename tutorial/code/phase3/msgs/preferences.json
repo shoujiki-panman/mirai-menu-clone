@@ -1,0 +1,9 @@
+{
+  "protocol": "mirai-menu/v1",
+  "passphrase": "REPLACE_WITH_PASSPHRASE",
+  "from_bot": "飲み会メンバーA",
+  "table_id": "trattoria-luce/0102",
+  "type": "preferences",
+  "constraints": { "avoid": ["えび"], "allergy": true, "drinks": "なんでもOK" },
+  "note": "甲殻類は避けたい"
+}

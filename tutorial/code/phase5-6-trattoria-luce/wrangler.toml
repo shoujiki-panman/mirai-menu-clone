@@ -1,0 +1,14 @@
+# Trattoria Luce（デモ店舗）バックエンド
+name = "trattoria-luce-backend"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# public/ の HTML をそのまま配信（/api/* は静的ファイルに無いので Worker が処理）
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# テーブル情報の保存先。`npx wrangler kv namespace create TABLES` で作った id を入れる
+[[kv_namespaces]]
+binding = "TABLES"
+id = "REPLACE_WITH_YOUR_KV_ID"

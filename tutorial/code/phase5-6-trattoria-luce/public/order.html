@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ご注文｜Trattoria Luce</title>
+<style>
+  :root { --green:#2f6b45; --ink:#222; --bg:#f4f2ee; --gold:#e5b83a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; background:var(--bg); color:var(--ink); padding-bottom:90px; }
+  header { background:var(--green); color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+  header b { font-family: Georgia, serif; font-size:20px; }
+  main { max-width:1100px; margin:0 auto; padding:12px 16px; }
+  label { font-size:13px; color:#555; display:block; margin:12px 0 6px; }
+  input[type=text] { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-radius:10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:7px 14px; border:1px solid #ccc; border-radius:999px; background:#fff; font-size:14px; }
+  .chip.on { background:#333; color:#fff; border-color:#333; text-decoration:line-through; }
+  h2 { border-left:5px solid var(--gold); padding-left:8px; font-size:18px; margin:22px 0 10px; }
+  .items { display:grid; grid-template-columns:1fr; gap:10px; }
+  @media (min-width: 900px) { .items { grid-template-columns:repeat(3,1fr); } } /* iPad 横向けは3列 */
+  .item { background:#fff; border-radius:14px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; border:2px solid transparent; }
+  .item.star { border-color:var(--gold); }
+  .item small { color:#888; display:block; }
+  .item .ok { font-size:11px; color:var(--green); }
+  .qty { display:flex; align-items:center; gap:10px; }
+  .qty button { width:36px; height:36px; border-radius:50%; border:0; background:var(--green); color:#fff; font-size:20px; }
+  .note { background:#fff8e1; border-radius:10px; padding:10px; margin-top:12px; display:none; }
+  footer { position:fixed; bottom:0; left:0; right:0; background:#1f2a24; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; }
+  footer button { background:var(--gold); border:0; border-radius:10px; padding:12px 18px; font-weight:700; font-size:16px; color:#2a5ea8; }
+  .toast { color:#c00; font-size:13px; min-height:1em; }
+</style>
+</head>
+<body>
+<header><b>☀ Trattoria Luce</b><span>テーブル <b id="code">----</b></span></header>
+<main>
+  <div id="joinBox">
+    <label>お名前（ニックネーム）</label>
+    <input type="text" id="nick" placeholder="例：たろう" maxlength="20">
+  </div>
+  <label>アレルギー・苦手なもの（タップで除外）</label>
+  <div class="chips" id="chips"></div>
+  <div class="note" id="botNote"></div>
+  <p class="toast" id="toast"></p>
+  <div id="menu"></div>
+</main>
+<footer><span id="total">¥0</span><button id="submit">注文する</button></footer>
+<script>
+  const params = new URLSearchParams(location.search);
+  const code = (location.pathname.match(/^\/t\/(\d{4})$/) || [])[1] || params.get("table");
+  document.getElementById("code").textContent = code || "----";
+  const LS = "mirai-menu:" + code;
+  // 自分の苦手はこの端末に保存。サーバーへは「避けるタグ」だけ送る
+  let me = JSON.parse(localStorage.getItem(LS) || "{}"); // {memberId, nickname, avoid}
+  me.avoid = me.avoid || [];
+  let menu = [], tags = [], categories = [], table = null;
+
+  const toast = (t) => (document.getElementById("toast").textContent = t || "");
+  const api = async (path, opt = {}) => {
+    const r = await fetch("/api/tables/" + code + path, { headers: { "content-type": "application/json" }, ...opt });
+    return r.json();
+  };
+  const persist = () => localStorage.setItem(LS, JSON.stringify(me));
+
+  async function ensureJoined() {
+    if (me.memberId) return true;
+    const nickname = document.getElementById("nick").value.trim() || "ゲスト";
+    const d = await api("/join", { method: "POST", body: JSON.stringify({ nickname, avoid: me.avoid }) });
+    if (!d.ok) { toast(d.error); return false; }
+    me.memberId = d.memberId; me.nickname = nickname; persist();
+    document.getElementById("joinBox").style.display = "none";
+    return true;
+  }
+
+  function renderChips() {
+    const box = document.getElementById("chips");
+    box.innerHTML = "";
+    for (const t of tags) {
+      const b = document.createElement("button");
+      b.className = "chip" + (me.avoid.includes(t) ? " on" : "");
+      b.textContent = t;
+      b.onclick = async () => {
+        me.avoid = me.avoid.includes(t) ? me.avoid.filter((x) => x !== t) : [...me.avoid, t];
+        persist(); renderChips(); renderMenu();
+        if (me.memberId) table = (await api("/members/" + me.memberId, { method: "PUT", body: JSON.stringify({ avoid: me.avoid }) })).table;
+        renderMenu();
+      };
+      box.appendChild(b);
+    }
+  }
+
+  function renderMenu() {
+    const qty = Object.fromEntries((table?.cart || []).map((c) => [c.id, c.qty]));
+    const union = table?.avoidUnion || [];
+    const visible = menu.filter((m) => !m.tags.some((t) => me.avoid.includes(t))); // 自分のNGを除外
+    const root = document.getElementById("menu");
+    root.innerHTML = "";
+    for (const cat of categories) {
+      const list = visible.filter((m) => m.cat === cat);
+      if (!list.length) continue;
+      root.insertAdjacentHTML("beforeend", `<h2>${cat}</h2><div class="items" data-cat="${cat}"></div>`);
+      const grid = root.lastElementChild;
+      for (const m of list) {
+        const allOk = !m.tags.some((t) => union.includes(t));
+        const el = document.createElement("div");
+        el.className = "item" + (m.star ? " star" : "");
+        el.innerHTML = `<div>${m.name}${m.star ? " ⭐" : ""}<small>¥${m.price}</small>${allOk && union.length ? '<span class="ok">✓ テーブル全員OK</span>' : ""}</div>
+          <div class="qty"><button data-d="-1">−</button><span>${qty[m.id] || 0}</span><button data-d="1">＋</button></div>`;
+        el.querySelectorAll("button").forEach((b) => (b.onclick = async () => {
+          if (!(await ensureJoined())) return;
+          const d = await api("/cart", { method: "POST", body: JSON.stringify({ itemId: m.id, delta: Number(b.dataset.d) }) });
+          if (!d.ok) return toast(d.error);
+          table = d.table; toast(d.warning); renderMenu();
+        }));
+        grid.appendChild(el);
+      }
+    }
+    document.getElementById("total").textContent = "¥" + (table?.total || 0).toLocaleString();
+    const note = document.getElementById("botNote");
+    note.style.display = table?.botNote ? "block" : "none";
+    note.textContent = table?.botNote ? "🤖 ボットからの注文: " + table.botNote : "";
+    if (table?.status === "ordered") document.getElementById("submit").textContent = "注文済み";
+  }
+
+  document.getElementById("submit").onclick = async () => {
+    const d = await api("/submit", { method: "POST" });
+    if (!d.ok) return toast(d.error);
+    table = d.table; renderMenu(); toast("ご注文を受け付けました！");
+  };
+
+  async function refresh() {
+    const d = await api("");
+    if (!d.ok) { toast(d.error); return; }
+    table = d.table; renderMenu();
+  }
+
+  (async () => {
+    if (!code) return toast("テーブル番号がありません");
+    if (me.memberId) document.getElementById("joinBox").style.display = "none";
+    const m = await (await fetch("/api/menu")).json();
+    menu = m.items; tags = m.tags; categories = m.categories;
+    renderChips(); await refresh();
+    setInterval(refresh, 3000); // 同じテーブルのカートを3秒ごとに同期
+  })();
+</script>
+</body>
+</html>

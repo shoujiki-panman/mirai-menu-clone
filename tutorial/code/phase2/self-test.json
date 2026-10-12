@@ -1,0 +1,9 @@
+{
+  "protocol": "mirai-menu/v1",
+  "passphrase": "REPLACE_WITH_PASSPHRASE",
+  "from_bot": "self-test",
+  "table_id": "self-test/0001",
+  "type": "preferences",
+  "constraints": { "avoid": ["えび"], "allergy": false, "drinks": "なんでもOK" },
+  "note": "自分のwebhookへの疎通テスト。proposal を返さず、受信したことだけ持ち主に報告して終了して"
+}

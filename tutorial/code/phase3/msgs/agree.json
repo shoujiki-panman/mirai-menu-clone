@@ -1,0 +1,9 @@
+{
+  "protocol": "mirai-menu/v1",
+  "passphrase": "REPLACE_WITH_PASSPHRASE",
+  "from_bot": "飲み会メンバーA",
+  "table_id": "trattoria-luce/0102",
+  "type": "agree",
+  "proposal": ["彩り野菜のグリーンサラダ", "スパイシーチキンウィング", "マルゲリータ", "ペペロンチーノ", "生ビール x2", "ノンアルコールビール x1"],
+  "note": "OK"
+}
